@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ポケポケ戦績・相性チェッカー</title>
+    <style>
+        body { font-family: sans-serif; padding: 15px; background: #f4f4f7; color: #333; }
+        h1, h2 { font-size: 1.2rem; margin-top: 0; }
+        .card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        label { display: block; margin-top: 8px; font-weight: bold; font-size: 0.9rem; }
+        input, select, button { width: 100%; padding: 10px; margin-top: 4px; box-sizing: border-box; border-radius: 4px; border: 1px solid #ccc; font-size: 1rem; }
+        button { background: #28a745; color: white; font-weight: bold; border: none; margin-top: 15px; cursor: pointer; }
+        button.btn-danger { background: #dc3545; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        th { background: #eee; }
+    </style>
+</head>
+<body>
+
+    <h1>ポケポケ戦績・相性トラッカー</h1>
+
+    <div class="card">
+        <h2>対戦結果を記録</h2>
+        <label>自分のデッキ</label>
+        <input type="text" id="mydeck" placeholder="例: ピカチュウex">
+        
+        <label>相手のデッキ</label>
+        <input type="text" id="oppdeck" placeholder="例: ミュウツーex">
+        
+        <label>手番</label>
+        <select id="turn">
+            <option value="先攻">先攻</option>
+            <option value="後攻">後攻</option>
+        </select>
+        
+        <label>勝敗</label>
+        <select id="result">
+            <option value="勝利">勝利</option>
+            <option value="敗北">敗北</option>
+        </select>
+        
+        <button type="button" onclick="addrecord()">記録を保存</button>
+    </div>
+
+    <div class="card">
+        <h2>デッキ相性・勝率分析</h2>
+        
+        <label>分析対象（自分のデッキ）</label>
+        <select id="filtermydeck" onchange="updatestats()">
+            <option value="すべて">すべてのマイデッキ</option>
+        </select>
+        
+        <table id="statstable">
+            <thead>
+                <tr>
+                    <th>対戦相手</th>
+                    <th>試合数</th>
+                    <th>勝 - 敗</th>
+                    <th>勝率</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        
+        <button type="button" class="btn-danger" onclick="clearrecords()">全データをリセット</button>
+    </div>
+
+    <script>
+        let records = [];
+        try {
+            records = JSON.parse(localStorage.getItem('pokepoke_records')) || [];
+        } catch (e) {
+            records = [];
+        }
+
+        function addrecord() {
+            const mydeck = document.getElementById('mydeck').value.trim();
+            const oppdeck = document.getElementById('oppdeck').value.trim();
+            const turn = document.getElementById('turn').value;
+            const result = document.getElementById('result').value;
+
+            if (!mydeck || !oppdeck) {
+                alert('自分と相手のデッキ名を入力してください');
+                return;
+            }
+
+            records.push({ 
+                mydeck: mydeck, 
+                oppdeck: oppdeck, 
+                turn: turn, 
+                result: result, 
+                date: new Date().toLocaleDateString() 
+            });
+            
+            try {
+                localStorage.setItem('pokepoke_records', JSON.stringify(records));
+            } catch (e) {
+                alert('保存に失敗しました');
+            }
+
+            updatefilteroptions();
+            updatestats();
+
+            document.getElementById('oppdeck').value = '';
+            alert('保存しました！');
+        }
+
+        function updatefilteroptions() {
+            const filterselect = document.getElementById('filtermydeck');
+            const currentselection = filterselect.value;
+
+            const mydecks = Array.from(new Set(records.map(function(r) { return r.mydeck; })));
+
+            filterselect.innerHTML = '<option value="すべて">すべてのマイデッキ</option>';
+            mydecks.forEach(function(deck) {
+                filterselect.innerHTML += '<option value="' + deck + '">' + deck + '</option>';
+            });
+
+            if (mydecks.includes(currentselection)) {
+                filterselect.value = currentselection;
+            }
+        }
+
+        function updatestats() {
+            const filtervalue = document.getElementById('filtermydeck');
+            const stats = {};
+
+            const filteredrecords = records.filter(function(r) {
+                return filtervalue.value === 'すべて' || r.mydeck === filtervalue.value;
+            });
+
+            filteredrecords.forEach(function(r) {
+                if (!stats[r.oppdeck]) stats[r.oppdeck] = { win: 0, loss: 0 };
+                if (r.result === '勝利') stats[r.oppdeck].win++;
+                else stats[r.oppdeck].loss++;
+            });
+
+            const tbody = document.querySelector('#statstable tbody');
+            tbody.innerHTML = '';
+            
+            Object.keys(stats).forEach(function(deck) {
+                const data = stats[deck];
+                const total = data.win + data.loss;
+                const rate = ((data.win / total) * 100).toFixed(1);
+                tbody.innerHTML += '<tr><td>' + deck + '</td><td>' + total + '</td><td>' + data.win + ' - ' + data.loss + '</td><td>' + rate + '%</td></tr>';
+            });
+        }
+
+        function clearrecords() {
+            if (confirm('これまでの対戦データをすべて削除します。よろしいですか？')) {
+                records = [];
+                localStorage.removeItem('pokepoke_records');
+                updatefilteroptions();
+                updatestats();
+            }
+        }
+
+        updatefilteroptions();
+        updatestats();
+    </script>
+</body>
+</html>

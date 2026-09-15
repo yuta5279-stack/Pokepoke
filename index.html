@@ -8,13 +8,14 @@
         body { font-family: sans-serif; padding: 15px; background: #f4f4f7; color: #333; }
         h1, h2 { font-size: 1.2rem; margin-top: 0; }
         .card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        label { display: block; margin-top: 8px; font-weight: bold; font-size: 0.9rem; }
+        label { display: block; margin-top: 10px; font-weight: bold; font-size: 0.9rem; }
         input, select, button { width: 100%; padding: 10px; margin-top: 4px; box-sizing: border-box; border-radius: 4px; border: 1px solid #ccc; font-size: 1rem; }
         button { background: #28a745; color: white; font-weight: bold; border: none; margin-top: 15px; cursor: pointer; }
         button.btn-danger { background: #dc3545; margin-top: 10px; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: center; vertical-align: middle; }
         th { background: #eee; }
+        tfoot tr { background: #f9f9f9; font-weight: bold; }
         .pk-icon { width: 32px; height: 32px; vertical-align: middle; margin-right: 5px; }
         .flex-cell { display: flex; align-items: center; justify-content: center; gap: 4px; }
     </style>
@@ -25,12 +26,23 @@
 
     <div class="card">
         <h2>対戦結果を記録</h2>
-        <label>自分のデッキ（例: ピカチュウex）</label>
-        <input type="text" id="mydeck" placeholder="例: ピカチュウex">
         
-        <label>相手のデッキ（例: ミュウツーex）</label>
-        <input type="text" id="oppdeck" placeholder="例: ミュウツーex">
-        
+        <!-- 自分のデッキ選択 -->
+        <label>自分のデッキ</label>
+        <select id="mydeck_select" onchange="toggleDeckInput('mydeck')">
+            <option value="">-- 選択してください --</option>
+            <option value="__NEW__">＋ 新しいデッキを直接入力</option>
+        </select>
+        <input type="text" id="mydeck_text" placeholder="例: ピカチュウex" style="display: none; margin-top: 6px;">
+
+        <!-- 相手のデッキ選択 -->
+        <label>相手のデッキ</label>
+        <select id="oppdeck_select" onchange="toggleDeckInput('oppdeck')">
+            <option value="">-- 選択してください --</option>
+            <option value="__NEW__">＋ 新しいデッキを直接入力</option>
+        </select>
+        <input type="text" id="oppdeck_text" placeholder="例: ミュウツーex" style="display: none; margin-top: 6px;">
+
         <label>手番</label>
         <select id="turn">
             <option value="先攻">先攻</option>
@@ -64,13 +76,20 @@
                 </tr>
             </thead>
             <tbody></tbody>
+            <tfoot>
+                <tr id="total_row">
+                    <td>合計</td>
+                    <td id="total_matches">0</td>
+                    <td id="total_wins_losses">0 - 0</td>
+                    <td id="total_win_rate">0.0%</td>
+                </tr>
+            </tfoot>
         </table>
         
         <button type="button" class="btn-danger" onclick="clearrecords()">全データをリセット</button>
     </div>
 
     <script>
-        // 主要ポケモンの名前キーと図鑑番号のマップ
         const pokemonMap = {
             "フシギダネ": 1, "フシギソウ": 2, "フシギバナ": 3,
             "ヒトカゲ": 4, "リザード": 5, "リザードン": 6,
@@ -116,14 +135,35 @@
             records = [];
         }
 
+        function toggleDeckInput(target) {
+            const select = document.getElementById(target + '_select');
+            const textInput = document.getElementById(target + '_text');
+            if (select.value === '__NEW__') {
+                textInput.style.display = 'block';
+                textInput.focus();
+            } else {
+                textInput.style.display = 'none';
+                textInput.value = '';
+            }
+        }
+
+        function getDeckValue(target) {
+            const select = document.getElementById(target + '_select');
+            const textInput = document.getElementById(target + '_text');
+            if (select.value === '__NEW__') {
+                return textInput.value.trim();
+            }
+            return select.value;
+        }
+
         function addrecord() {
-            const mydeck = document.getElementById('mydeck').value.trim();
-            const oppdeck = document.getElementById('oppdeck').value.trim();
+            const mydeck = getDeckValue('mydeck');
+            const oppdeck = getDeckValue('oppdeck');
             const turn = document.getElementById('turn').value;
             const result = document.getElementById('result').value;
 
             if (!mydeck || !oppdeck) {
-                alert('自分と相手のデッキ名を入力してください');
+                alert('自分と相手のデッキを選択または入力してください');
                 return;
             }
 
@@ -141,22 +181,47 @@
                 alert('保存に失敗しました');
             }
 
+            refreshDeckDropdowns();
             updatefilteroptions();
             updatestats();
 
-            document.getElementById('oppdeck').value = '';
+            document.getElementById('oppdeck_select').value = '';
+            toggleDeckInput('oppdeck');
             alert('保存しました！');
+        }
+
+        function refreshDeckDropdowns() {
+            const allMyDecks = Array.from(new Set(records.map(r => r.mydeck)));
+            const allOppDecks = Array.from(new Set(records.map(r => r.oppdeck)));
+
+            buildSelectOptions('mydeck_select', allMyDecks);
+            buildSelectOptions('oppdeck_select', allOppDecks);
+        }
+
+        function buildSelectOptions(selectId, deckList) {
+            const select = document.getElementById(selectId);
+            const currentVal = select.value;
+            
+            select.innerHTML = '<option value="">-- 選択してください --</option>';
+            deckList.forEach(deck => {
+                select.innerHTML += `<option value="${deck}">${deck}</option>`;
+            });
+            select.innerHTML += '<option value="__NEW__">＋ 新しいデッキを直接入力</option>';
+
+            if (deckList.includes(currentVal)) {
+                select.value = currentVal;
+            }
         }
 
         function updatefilteroptions() {
             const filterselect = document.getElementById('filtermydeck');
             const currentselection = filterselect.value;
 
-            const mydecks = Array.from(new Set(records.map(function(r) { return r.mydeck; })));
+            const mydecks = Array.from(new Set(records.map(r => r.mydeck)));
 
             filterselect.innerHTML = '<option value="すべて">すべてのマイデッキ</option>';
-            mydecks.forEach(function(deck) {
-                filterselect.innerHTML += '<option value="' + deck + '">' + deck + '</option>';
+            mydecks.forEach(deck => {
+                filterselect.innerHTML += `<option value="${deck}">${deck}</option>`;
             });
 
             if (mydecks.includes(currentselection)) {
@@ -168,37 +233,53 @@
             const filtervalue = document.getElementById('filtermydeck');
             const stats = {};
 
-            const filteredrecords = records.filter(function(r) {
-                return filtervalue.value === 'すべて' || r.mydeck === filtervalue.value;
-            });
+            const filteredrecords = records.filter(r => filtervalue.value === 'すべて' || r.mydeck === filtervalue.value);
 
-            filteredrecords.forEach(function(r) {
+            let totalWins = 0;
+            let totalLosses = 0;
+
+            filteredrecords.forEach(r => {
                 if (!stats[r.oppdeck]) stats[r.oppdeck] = { win: 0, loss: 0 };
-                if (r.result === '勝利') stats[r.oppdeck].win++;
-                else stats[r.oppdeck].loss++;
+                if (r.result === '勝利') {
+                    stats[r.oppdeck].win++;
+                    totalWins++;
+                } else {
+                    stats[r.oppdeck].loss++;
+                    totalLosses++;
+                }
             });
 
             const tbody = document.querySelector('#statstable tbody');
             tbody.innerHTML = '';
             
-            Object.keys(stats).forEach(function(deck) {
+            Object.keys(stats).forEach(deck => {
                 const data = stats[deck];
                 const total = data.win + data.loss;
                 const rate = ((data.win / total) * 100).toFixed(1);
                 const iconHtml = getPokemonIconHtml(deck);
-                tbody.innerHTML += '<tr><td><div class="flex-cell">' + iconHtml + '<span>' + deck + '</span></div></td><td>' + total + '</td><td>' + data.win + ' - ' + data.loss + '</td><td>' + rate + '%</td></tr>';
+                tbody.innerHTML += `<tr><td><div class="flex-cell">${iconHtml}<span>${deck}</span></div></td><td>${total}</td><td>${data.win} - ${data.loss}</td><td>${rate}%</td></tr>`;
             });
+
+            // 合計行の更新
+            const grandTotal = totalWins + totalLosses;
+            const overallRate = grandTotal > 0 ? ((totalWins / grandTotal) * 100).toFixed(1) : "0.0";
+
+            document.getElementById('total_matches').textContent = grandTotal;
+            document.getElementById('total_wins_losses').textContent = `${totalWins} - ${totalLosses}`;
+            document.getElementById('total_win_rate').textContent = `${overallRate}%`;
         }
 
         function clearrecords() {
             if (confirm('これまでの対戦データをすべて削除します。よろしいですか？')) {
                 records = [];
                 localStorage.removeItem('pokepoke_records');
+                refreshDeckDropdowns();
                 updatefilteroptions();
                 updatestats();
             }
         }
 
+        refreshDeckDropdowns();
         updatefilteroptions();
         updatestats();
     </script>

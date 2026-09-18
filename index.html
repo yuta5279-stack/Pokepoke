@@ -7,15 +7,18 @@
     <style>
         body { font-family: sans-serif; padding: 15px; background: #f4f4f7; color: #333; }
         h1, h2 { font-size: 1.2rem; margin-top: 0; }
+        h3 { font-size: 1rem; margin-top: 20px; margin-bottom: 5px; color: #555; }
         .card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         label { display: block; margin-top: 10px; font-weight: bold; font-size: 0.9rem; }
         input, select, button { width: 100%; padding: 10px; margin-top: 4px; box-sizing: border-box; border-radius: 4px; border: 1px solid #ccc; font-size: 1rem; }
         button { background: #28a745; color: white; font-weight: bold; border: none; margin-top: 15px; cursor: pointer; }
         button.btn-danger { background: #dc3545; margin-top: 10px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.85rem; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: center; vertical-align: middle; }
         th { background: #eee; }
         tfoot tr { background: #f9f9f9; font-weight: bold; }
+        .win { color: #d9534f; font-weight: bold; } /* 勝利を赤色の○ */
+        .loss { color: #0275d8; font-weight: bold; } /* 敗北を青色の✕ */
     </style>
 </head>
 <body>
@@ -80,6 +83,26 @@
                     <td id="total_matches">0</td>
                     <td id="total_wins_losses">0 - 0</td>
                     <td id="total_win_rate">0.0%</td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <!-- 直近10試合の履歴テーブル -->
+        <h3>直近10試合の履歴</h3>
+        <table id="recenttable">
+            <thead>
+                <tr>
+                    <th>自デッキ</th>
+                    <th>敵デッキ</th>
+                    <th>先/後</th>
+                    <th>勝敗</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="3" style="text-align: right;">直近10試合の勝率:</td>
+                    <td id="recent_win_rate">0.0%</td>
                 </tr>
             </tfoot>
         </table>
@@ -226,6 +249,37 @@
             document.getElementById('total_matches').textContent = grandTotal;
             document.getElementById('total_wins_losses').textContent = `${totalWins} - ${totalLosses}`;
             document.getElementById('total_win_rate').textContent = `${overallRate}%`;
+
+            // 直近10試合の更新（絞り込み対象の全データから直近10件を取得）
+            updateRecent10(filteredrecords);
+        }
+
+        function updateRecent10(filteredrecords) {
+            const recent10 = filteredrecords.slice(-10).reverse(); // 最新10件を取得し、新しい順に並べる
+            const recentTbody = document.querySelector('#recenttable tbody');
+            recentTbody.innerHTML = '';
+
+            let recentWins = 0;
+
+            recent10.forEach(r => {
+                const isWin = r.result === '勝利';
+                if (isWin) recentWins++;
+                
+                const resultMark = isWin ? '<span class="win">○</span>' : '<span class="loss">✕</span>';
+
+                recentTbody.innerHTML += `
+                    <tr>
+                        <td>${r.mydeck}</td>
+                        <td>${r.oppdeck}</td>
+                        <td>${r.turn}</td>
+                        <td>${resultMark}</td>
+                    </tr>
+                `;
+            });
+
+            const recentTotal = recent10.length;
+            const recentRate = recentTotal > 0 ? ((recentWins / recentTotal) * 100).toFixed(1) : "0.0";
+            document.getElementById('recent_win_rate').textContent = `${recentRate}%`;
         }
 
         function clearrecords() {
